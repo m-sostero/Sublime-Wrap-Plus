@@ -10,7 +10,12 @@ except ImportError:
 
 
 def is_quoted_string(scope_r, scope_name):
-    return 'quoted' in scope_name
+    # string.quoted.double.block.python
+    # string.quoted.single.block.python
+    # string.quoted.double.single-line.python
+    # string.quoted.single.single-line.python
+    # comment.block.documentation.python
+    return 'quoted' in scope_name or 'comment.block.documentation' in scope_name
 
 debug_enabled = False
 time_start = 0
@@ -124,11 +129,13 @@ class PrefixStrippingView(object):
             if first_star_prefix:
                 self.required_comment_prefix = first_star_prefix
             # Narrow the scope to just the comment contents.
-            if (self.view.substr(sublime.Region(scope_r.begin(), scope_r.begin()+2)) == '/*' and
-                self.view.substr(sublime.Region(scope_r.end()-2, scope_r.end())) == '*/'
-               ):
-                self.min = max(self.min, scope_r.begin()+2)
-                self.max = min(self.max, scope_r.end()-2)
+            scope_text = self.view.substr(scope_r)
+            m = re.match(r'^([ \t\n]*/\*).*(\*/[ \t\n]*)$', scope_text, re.DOTALL)
+            if m:
+                begin = scope_r.begin() + len(m.group(1))
+                end = scope_r.end() - len(m.group(2))
+                self.min = max(self.min, begin)
+                self.max = min(self.max, end)
             debug('Scope narrowed to %i:%i', self.min, self.max)
 
         debug('required_comment_prefix determined to be %r', self.required_comment_prefix,)
@@ -209,7 +216,7 @@ numbered_list = r'(?:(?:[0-9#]+[.)])+[\t ])'
 lettered_list = r'(?:[\w][.)][\t ])'
 bullet_list = r'(?:[*+#-]+[\t ])'
 list_pattern = re.compile(r'^[ \t]*' + OR(numbered_list, lettered_list, bullet_list) + r'[ \t]*')
-latex_hack = r'(?:\\)'
+latex_hack = r'(?:\\)(?!,|;|&|%|text|emph|cite|\w?(page)?ref|url|footnote|(La)*TeX)'
 rest_directive = r'(?:\.\.)'
 field_start = r'(?:[:@])'  # rest, javadoc, jsdoc, etc.
 new_paragraph_pattern = re.compile(r'^[\t ]*' +
